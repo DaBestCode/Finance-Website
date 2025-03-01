@@ -4,7 +4,6 @@ import { Client } from "dwolla-v2";
 
 const getEnvironment = (): "production" | "sandbox" => {
   const environment = process.env.DWOLLA_ENV as string;
-
   switch (environment) {
     case "sandbox":
       return "sandbox";
@@ -23,23 +22,64 @@ const dwollaClient = new Client({
   secret: process.env.DWOLLA_SECRET as string,
 });
 
+// ----------------------------------------
+// Interfaces
+// ----------------------------------------
+export interface NewDwollaCustomerParams {
+  firstName: string;
+  lastName: string;
+  email: string;
+  address1: string;
+  city: string;
+  postalCode: string;
+  dateOfBirth: string;
+  ssn: string;
+  type: 'personal' | 'business';
+  state?: string; // now optional
+}
+
+export interface CreateFundingSourceOptions {
+  customerId: string;
+  fundingSourceName: string;
+  plaidToken: string;
+  _links?: any; // Adjust this type as needed
+}
+
+export interface TransferParams {
+  sourceFundingSourceUrl: string;
+  destinationFundingSourceUrl: string;
+  amount: string; // or number if preferred
+}
+
+export interface AddFundingSourceParams {
+  dwollaCustomerId: string;
+  processorToken: string;
+  bankName: string;
+}
+
+// ----------------------------------------
+// Dwolla Actions
+// ----------------------------------------
+
 // Create a Dwolla Funding Source using a Plaid Processor Token
 export const createFundingSource = async (
   options: CreateFundingSourceOptions
-) => {
+): Promise<string | undefined> => {
   try {
     return await dwollaClient
       .post(`customers/${options.customerId}/funding-sources`, {
         name: options.fundingSourceName,
         plaidToken: options.plaidToken,
       })
-      .then((res) => res.headers.get("location"));
+      .then((res) => res.headers.get("location") || undefined);
   } catch (err) {
     console.error("Creating a Funding Source Failed: ", err);
+    return undefined;
   }
 };
 
-export const createOnDemandAuthorization = async () => {
+// Create an On-Demand Authorization for Dwolla
+export const createOnDemandAuthorization = async (): Promise<any> => {
   try {
     const onDemandAuthorization = await dwollaClient.post(
       "on-demand-authorizations"
@@ -51,23 +91,26 @@ export const createOnDemandAuthorization = async () => {
   }
 };
 
+// Create a Dwolla Customer
 export const createDwollaCustomer = async (
   newCustomer: NewDwollaCustomerParams
-) => {
+): Promise<string | undefined> => {
   try {
     return await dwollaClient
       .post("customers", newCustomer)
-      .then((res) => res.headers.get("location"));
+      .then((res) => res.headers.get("location") || undefined);
   } catch (err) {
     console.error("Creating a Dwolla Customer Failed: ", err);
+    return undefined;
   }
 };
 
+// Create a Transfer
 export const createTransfer = async ({
   sourceFundingSourceUrl,
   destinationFundingSourceUrl,
   amount,
-}: TransferParams) => {
+}: TransferParams): Promise<string | undefined> => {
   try {
     const requestBody = {
       _links: {
@@ -85,30 +128,34 @@ export const createTransfer = async ({
     };
     return await dwollaClient
       .post("transfers", requestBody)
-      .then((res) => res.headers.get("location"));
+      .then((res) => res.headers.get("location") || undefined);
   } catch (err) {
     console.error("Transfer fund failed: ", err);
+    return undefined;
   }
 };
 
+// Add a Funding Source using a Plaid Processor Token and On-Demand Authorization
 export const addFundingSource = async ({
   dwollaCustomerId,
   processorToken,
   bankName,
-}: AddFundingSourceParams) => {
+}: AddFundingSourceParams): Promise<string | undefined> => {
   try {
-    // create dwolla auth link
+    // Create Dwolla authorization link
     const dwollaAuthLinks = await createOnDemandAuthorization();
 
-    // add funding source to the dwolla customer & get the funding source url
-    const fundingSourceOptions = {
+    // Build the funding source options payload
+    const fundingSourceOptions: CreateFundingSourceOptions = {
       customerId: dwollaCustomerId,
       fundingSourceName: bankName,
       plaidToken: processorToken,
       _links: dwollaAuthLinks,
     };
+
     return await createFundingSource(fundingSourceOptions);
   } catch (err) {
     console.error("Transfer fund failed: ", err);
+    return undefined;
   }
 };
