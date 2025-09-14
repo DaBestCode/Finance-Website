@@ -129,13 +129,15 @@ export const signUp = async ({ password, ...userData }: SignUpParams) => {
     console.log("[signUp] Appwrite user created. userId:", newUserAccount.$id);
 
     // Construct Dwolla payload including state (as required)
+    const stateAbbr = state.trim().toUpperCase(); // Ensures uppercase
+
     const dwollaPayload: NewDwollaCustomerParams = {
       firstName,
       lastName,
       email,
       address1,
       city,
-      state, // include state here for Dwolla validation
+      state: stateAbbr, // use the corrected abbreviation
       postalCode,
       dateOfBirth,
       ssn,
